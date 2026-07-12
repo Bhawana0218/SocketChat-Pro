@@ -446,24 +446,10 @@ GET /api/health
 ## Deployment
 
 ### Backend (Render)
-
-1. Push code to GitHub
-2. Create a new Web Service on [Render](https://render.com)
-3. Set environment variables:
-   - `MONGODB_URI` = your MongoDB Atlas connection string
-   - `CLIENT_URL` = your Vercel frontend URL
-   - `NODE_ENV` = production
-4. Deploy
+https://socketchat-pro.onrender.com/api/health
 
 ### Frontend (Vercel)
-
-1. Push code to GitHub
-2. Import repository on [Vercel](https://vercel.com)
-3. Set environment variables:
-   - `VITE_API_URL` = your Render backend URL
-   - `VITE_SOCKET_URL` = your Render backend URL
-4. Deploy
-
+https://socket-chat-pro.vercel.app/
 ---
 
 ## License
