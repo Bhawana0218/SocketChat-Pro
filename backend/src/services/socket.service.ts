@@ -226,55 +226,45 @@ export class SocketService {
         this.io.emit("message_read", { messageId: data.messageId });
       });
 
-      // Call signaling
+      // Call signaling — deliver to at most ONE socket per target user
+      const emitToUser = (targetUsername: string, event: string, payload: Record<string, unknown>) => {
+        const sent = new Set<string>();
+        for (const [socketId, userData] of this.onlineUsers) {
+          if (userData.username === targetUsername && !sent.has(targetUsername)) {
+            sent.add(targetUsername);
+            this.io.to(socketId).emit(event as never, payload as never);
+          }
+        }
+      };
+
       socket.on("call_invite", (data) => {
         const username = socket.data.username;
         if (!username) return;
-        for (const [socketId, userData] of this.onlineUsers) {
-          if (userData.username === data.to) {
-            this.io.to(socketId).emit("call_invite", { from: username, callType: data.callType });
-          }
-        }
+        emitToUser(data.to, "call_invite", { from: username, callType: data.callType });
       });
 
       socket.on("call_accept", (data) => {
         const username = socket.data.username;
         if (!username) return;
-        for (const [socketId, userData] of this.onlineUsers) {
-          if (userData.username === data.to) {
-            this.io.to(socketId).emit("call_accept", { from: username });
-          }
-        }
+        emitToUser(data.to, "call_accept", { from: username });
       });
 
       socket.on("call_reject", (data) => {
         const username = socket.data.username;
         if (!username) return;
-        for (const [socketId, userData] of this.onlineUsers) {
-          if (userData.username === data.to) {
-            this.io.to(socketId).emit("call_reject", { from: username });
-          }
-        }
+        emitToUser(data.to, "call_reject", { from: username });
       });
 
       socket.on("call_end", (data) => {
         const username = socket.data.username;
         if (!username) return;
-        for (const [socketId, userData] of this.onlineUsers) {
-          if (userData.username === data.to) {
-            this.io.to(socketId).emit("call_end", { from: username });
-          }
-        }
+        emitToUser(data.to, "call_end", { from: username });
       });
 
       socket.on("call_signal", (data) => {
         const username = socket.data.username;
         if (!username) return;
-        for (const [socketId, userData] of this.onlineUsers) {
-          if (userData.username === data.to) {
-            this.io.to(socketId).emit("call_signal", { from: username, signal: data.signal });
-          }
-        }
+        emitToUser(data.to, "call_signal", { from: username, signal: data.signal });
       });
 
       socket.on("disconnect", async (reason) => {
