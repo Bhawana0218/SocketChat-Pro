@@ -19,6 +19,7 @@ export const CallModal = () => {
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const peerRef = useRef("");
@@ -37,6 +38,29 @@ export const CallModal = () => {
     console.log(TAG, new Date().toISOString(), ...args);
   }, []);
 
+  const attachRemoteStream = useCallback(
+    (stream: MediaStream) => {
+      log("[Media] Attaching remote stream to elements");
+
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = stream;
+        remoteVideoRef.current.play().catch((e) =>
+          console.error(TAG, "[Media] remoteVideo play() failed:", e)
+        );
+        log("[Media] Remote stream attached to video element");
+      }
+
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = stream;
+        remoteAudioRef.current.play().catch((e) =>
+          console.error(TAG, "[Media] remoteAudio play() failed:", e)
+        );
+        log("[Media] Remote stream attached to audio element");
+      }
+    },
+    [log]
+  );
+
   const cleanup = useCallback(() => {
     log("Cleaning up call resources");
     if (pcRef.current) {
@@ -47,6 +71,8 @@ export const CallModal = () => {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -73,17 +99,22 @@ export const CallModal = () => {
   const getMedia = useCallback(
     async (video: boolean): Promise<MediaStream | null> => {
       try {
-        log(`[Media] Requesting ${video ? "video" : "audio"} stream`);
+        log(`[Media] Requesting ${video ? "video+audio" : "audio-only"} stream`);
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video,
         });
         log(
           "[Media] Got tracks:",
-          stream.getTracks().map((t) => `${t.kind}:${t.enabled}`).join(", ")
+          stream.getTracks().map((t) => `${t.kind}:${t.enabled}:${t.label}`).join(", ")
         );
         streamRef.current = stream;
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          localVideoRef.current.play().catch((e) =>
+            console.error(TAG, "[Media] localVideo play() failed:", e)
+          );
+        }
         return stream;
       } catch (e) {
         console.error(TAG, "[Media] Failed to get user media:", e);
@@ -114,9 +145,9 @@ export const CallModal = () => {
     };
 
     pc.ontrack = (e) => {
-      log("[PeerConnection] Remote track received:", e.track.kind, e.track.label);
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = e.streams[0];
+      log("[PeerConnection] ontrack:", e.track.kind, e.track.label, "streams:", e.streams.length);
+      if (e.streams && e.streams[0]) {
+        attachRemoteStream(e.streams[0]);
       }
     };
 
@@ -127,15 +158,15 @@ export const CallModal = () => {
       if (pc.connectionState === "connected" && !timerRef.current) {
         timerRef.current = setInterval(() => setDuration((d) => d + 1), 1000);
       }
-      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-        log(`[PeerConnection] ${pc.connectionState} → ending call`);
+      if (pc.connectionState === "failed") {
+        log("[PeerConnection] FAILED → ending call");
         finish();
       }
     };
 
     pcRef.current = pc;
     return pc;
-  }, [log, finish]);
+  }, [log, finish, attachRemoteStream]);
 
   const flushIceQueue = useCallback(
     (pc: RTCPeerConnection) => {
@@ -396,6 +427,7 @@ export const CallModal = () => {
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
+      <audio ref={remoteAudioRef} autoPlay playsInline />
       <div className="bg-[#1e293b] border border-[#334155] rounded-2xl p-6 w-full max-w-md shadow-2xl">
         {isVideo ? (
           <div className="relative w-full aspect-video bg-[#0f172a] rounded-xl overflow-hidden mb-4">

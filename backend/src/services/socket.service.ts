@@ -227,12 +227,13 @@ export class SocketService {
       });
 
       // Call signaling — deliver to at most ONE socket per target user
-      const emitToUser = (targetUsername: string, event: string, payload: Record<string, unknown>) => {
-        const sent = new Set<string>();
+      const emitToUser = (targetUsername: string, event: string, payload: object) => {
+        let sent = false;
         for (const [socketId, userData] of this.onlineUsers) {
-          if (userData.username === targetUsername && !sent.has(targetUsername)) {
-            sent.add(targetUsername);
-            this.io.to(socketId).emit(event as never, payload as never);
+          if (userData.username === targetUsername && !sent) {
+            sent = true;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            this.io.to(socketId).emit(event as any, payload as any);
           }
         }
       };
